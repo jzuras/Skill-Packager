@@ -20,6 +20,8 @@ This bridges the gap between the two environments, allowing you to:
 - ✅ **Detailed error messages** - Clear feedback when validation fails
 - ✅ **Compatible with both old and modern PowerShell** - Works with `powershell.exe` and `pwsh`
 
+> **Note:** This repository also includes `generate-totalskills.cs`, a utility script for generating skills manifests for non-Claude Code agents. See [Skills Manifest Generator](#skills-manifest-generator) for details.
+
 ## Installation
 
 ### For Claude Code CLI Users
@@ -248,6 +250,116 @@ description: "Description here"
 4. **Upload to web** - Share via Settings → Capabilities
 5. **Test in web** - Verify it works in web environment
 6. **Iterate** - Make changes in CLI, re-package, re-upload
+
+## Skills Manifest Generator
+
+This repository includes `generate-totalskills.cs`, a .NET 10 script that generates a lightweight skills manifest file for use with AI agents that don't have native Claude Code skills support (like Gemini CLI, Codex CLI, etc.).
+
+### Purpose
+
+The script creates a `TotalSkills.md` file that mirrors how Claude Code discovers skills:
+- Lists all available skills with their names and descriptions from YAML frontmatter
+- Includes optional `allowed-tools` restrictions if defined
+- Provides file paths to full skill instructions
+- Uses minimal context (like Claude Code's startup behavior) - agents only load full skills when needed
+
+This enables other AI agents to use Claude Code skills by:
+1. Reading the lightweight TotalSkills.md manifest to discover available skills
+2. Loading the full SKILL.md file only when a user request matches a skill's description
+3. Following the skill's instructions autonomously
+
+### Usage
+
+```bash
+# Basic usage (output to current directory)
+dotnet run generate-totalskills.cs ~/.claude/skills
+
+# Specify output file
+dotnet run generate-totalskills.cs ~/.claude/skills /path/to/TotalSkills.md
+
+# Specify output directory (creates TotalSkills.md inside)
+dotnet run generate-totalskills.cs ~/.claude/skills /path/to/output/
+```
+
+**Parameters:**
+- `skills-directory` (required): Path to directory containing skill folders
+- `output-path` (optional): Output file or directory path (defaults to `./TotalSkills.md`)
+
+**Requirements:**
+- .NET 10 RC (uses `dotnet run app.cs` feature)
+- Cross-platform: Works on Windows and WSL/Linux
+
+### Example Output
+
+```
+Scanning skills in: C:\Users\Jim\.claude\skills
+Output file: TotalSkills.md
+
+✓ Found skill: dad-joke-rhymer
+✓ Found skill: endpoint-add
+✓ Found skill: endpoint-edit
+✓ Found skill: endpoint-list
+✓ Found skill: file-analyzer-poc
+✓ Found skill: glyph-add
+✓ Found skill: glyph-list
+✓ Found skill: simple-greeter
+✓ Found skill: skill-packager
+
+Total skills found: 9
+✓ Generated: TotalSkills.md
+```
+
+### Real-World Usage: Gemini CLI
+
+Here's an example of Gemini CLI successfully using the generated TotalSkills.md to discover and execute the `glyph-list` skill:
+
+```
+> read the totalskills md file in the current dir
+
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ✓  ReadFile TotalSkills.md                                                                                 │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+> list my glyphs
+
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ✓  ReadFile ..\glyph-list\SKILL.md                                                                         │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ Mystical Glyphs (3 total):
+
+   1. Glyph of Aether (power: 42)
+   2. Glyph of Zephyr (power: 31)
+   3. Glyph of Ember (power: 55)
+
+  What would you like to do?
+   - Add a new glyph
+   - Edit an existing glyph
+   - Delete a glyph
+   - Inspect glyph details
+```
+
+**What happened:**
+1. Gemini CLI read TotalSkills.md and learned about available skills
+2. User request "list my glyphs" matched the `glyph-list` skill description
+3. Gemini automatically loaded the full `SKILL.md` from the referenced path
+4. Executed the skill's instructions successfully
+
+### Integration with Agent Configurations
+
+Instead of manually telling the agent to read TotalSkills.md each time, you can automate this by updating agent configuration files:
+
+**For Gemini CLI** (or similar tools with startup configuration):
+- Add to `Agent.md` or equivalent startup file
+- Include instructions to read TotalSkills.md on initialization
+- This gives the agent automatic awareness of all available skills
+
+**Example Agent.md snippet:**
+```markdown
+On startup, read the TotalSkills.md file in the skills directory to discover available skills.
+When a user request matches a skill description, load and execute that skill's instructions.
+```
+
+This approach provides skill discovery without native skills support, using minimal context tokens.
 
 ## Copyright and License
 
